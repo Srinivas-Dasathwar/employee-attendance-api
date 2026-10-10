@@ -1,0 +1,13 @@
+﻿.venv/
+.env
+__pycache__/
+*.pyc
+check_explain.py
+check_concurrency.py
+make_big.py
+sample_seed.py
+sample_data/
+PROBLEM_STATEMENT.docx
+openapi.yaml
+DATA_MODEL.md
+*.zip
