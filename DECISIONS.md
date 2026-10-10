@@ -1,19 +1,11 @@
-<!-- # DECISIONS.md  (about 150-200 words in total - plain language, your own words)
-
-1. **Indexes.** Which indexes did you create, and which query or guarantee does each one serve? Which one did you consider and reject?
-2. **Punch-in race.** Two identical punch-in requests arrive at the same instant. Walk through exactly what happens in your code.
-3. **Ties.** Two employees are tied on late minutes at the cutoff of `limit`. What does your leaderboard return, and why?
-4. **Headcount.** How does your department summary make sure employees with zero logs are counted?
-5. **One thing you would change** if this had to serve 100x the data. -->
-
 # DECISIONS.md
 
-1. **Indexes.** I created a unique index on emp_code in employees, so ___. On attendance_logs I created a unique index on (emp_code, date) so ___, plus (date desc, emp_code) so ___, and (status, date, emp_code) so ___. I also added (emp_code, punch_in) for ___ and (department, joined_on) for ___. I considered an index on ___ but rejected it because ___.
+1. **Indexes.** I created a unique index on `emp_code` in `employees`, so duplicate employee codes are prevented. On `attendance_logs` I created a unique index on `(emp_code, date)` so each employee can have only one attendance record per day, plus `(date DESC, emp_code)` so attendance can be retrieved by date with employees in a consistent order, and `(status, date, emp_code)` so attendance can be filtered by status and date efficiently. I also added `(emp_code, punch_in)` for retrieving an employee's punch-in records in chronological order and `(department, joined_on)` for filtering employees by department and sorting by joining date. I considered an index on `punch_out` but rejected it because it is not frequently used in queries and would add unnecessary storage and write overhead.
 
-2. **Punch-in race.** Both requests ___. The unique index lets ___ succeed, and the other one gets ___ which I turn into ___. I don't check first because ___.
+2. **Punch-in race.** Both requests attempt to insert an attendance record for the same employee and date concurrently. The unique index lets only one request succeed, and the other one gets a duplicate-key error, which I turn into an HTTP `409 Conflict` response. I don't check first because two requests could pass the check simultaneously before either inserts the record, so the unique index is the reliable way to prevent duplicates.
 
-3. **Ties.** The leaderboard uses ___ to rank, so tied employees ___ and the next rank is ___. Because limit filters on rank, a tie at the cutoff returns ___ rows.
+3. **Ties.** The leaderboard uses MongoDB's `$rank` to rank employees by their attendance score, so tied employees receive the same rank and the next rank skips accordingly. For example, if two employees share rank 1, the next rank is 3. Because the limit filters on rank, a tie at the cutoff returns more than the requested number of rows when necessary to include all employees with that rank.
 
-4. **Headcount.** The department summary starts from the ___ collection, not the logs. After the lookup, the unwind keeps employees with no logs because ___, so they count as ___.
+4. **Headcount.** The department summary starts from the `employees` collection, not the logs. After the lookup, the unwind keeps employees with no logs because `preserveNullAndEmptyArrays: true` is enabled, so they count as employees in the department headcount even if they have no attendance records.
 
-5. **100x data.** I would change ___ because ___.
+5. **100x data.** I would change the aggregation and pagination strategy because processing and sorting a much larger dataset in every request can increase latency and memory usage. I would review query plans and index usage, optimize the aggregation pipeline, use indexed pagination or cursor-based pagination, and consider pre-aggregating frequently requested leaderboard and department summary results if real-world query patterns justify it.
